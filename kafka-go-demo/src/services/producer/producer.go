@@ -5,11 +5,13 @@ import (
 	"crypto/x509"
 	"fmt"
 	"io/ioutil"
+	"os"
 	"services"
-    "time"
-    "strconv"
+	"strconv"
+	"time"
 
 	"github.com/Shopify/sarama"
+	log "github.com/sirupsen/logrus"
 )
 
 var cfg *configs.MqConfig
@@ -17,7 +19,11 @@ var producer sarama.SyncProducer
 
 func init() {
 
-	fmt.Print("init kafka producer, it may take a few seconds to init the connection\n")
+	log.SetFormatter(&log.JSONFormatter{})
+	log.SetOutput(os.Stdout)
+	log.SetLevel(log.InfoLevel)
+
+	log.Info("init kafka producer, it may take a few seconds to init the connection")
 
 	var err error
 
@@ -74,15 +80,23 @@ func produce(topic string, key string, content string) error {
 		fmt.Println(msg)
 		return err
 	}
-    fmt.Printf("Send OK topic:%s key:%s value:%s\n", topic, key, content)
+	fmt.Printf("Send OK topic:%s key:%s value:%s\n", topic, key, content)
 
 	return nil
 }
 
 func main() {
-    //the key of the kafka messages 
-    //do not set the same the key for all messages, it may cause partition im-balance 
-    key := strconv.FormatInt(time.Now().UTC().UnixNano(), 10)
-    value := "this is a kafka message!"
-	produce(cfg.Topics[0], key, value)
+	//the key of the kafka messages
+	//do not set the same the key for all messages, it may cause partition im-balance
+	key := strconv.FormatInt(time.Now().UTC().UnixNano(), 10)
+	ticker := time.NewTicker(time.Second * 5)
+	value := "This is a kafka message! --JumpingQu(jumping.qu@chiefclouds.com)"
+	go func() {
+		for t := range ticker.C {
+			produce(cfg.Topics[0], key, fmt.Sprintf("%s %d\n", value, t))
+			log.Info(t)
+		}
+	}()
+	time.Sleep(time.Second * 200)
+	ticker.Stop()
 }
